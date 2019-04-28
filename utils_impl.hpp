@@ -7,50 +7,60 @@ CLI Macros utility functions
 //-------------------------------------------------------------------------
 // Utility function similar to Python's re.sub().
 // Based on https://stackoverflow.com/a/37516316
-namespace std
+
+#ifndef __utils_impl_hpp__
+#define __utils_impl_hpp__
+
+#include <cstdlib>
+#include <iostream>
+#include <string>
+#include <regex>
+#include <map>
+
+namespace std {
+
+template<class BidirIt, class Traits, class CharT, class UnaryFunction>
+std::basic_string<CharT> regex_replace(BidirIt first, BidirIt last,
+                                       const std::basic_regex<CharT, Traits> &re, UnaryFunction f)
 {
-    template<class BidirIt, class Traits, class CharT, class UnaryFunction>
-    std::basic_string<CharT> regex_replace(BidirIt first, BidirIt last,
-        const std::basic_regex<CharT, Traits> &re, UnaryFunction f)
-    {
-        std::basic_string<CharT> s;
+    std::basic_string<CharT> s;
 
-        typename std::match_results<BidirIt>::difference_type positionOfLastMatch = 0;
-        auto endOfLastMatch = first;
+    typename std::match_results<BidirIt>::difference_type
+            positionOfLastMatch = 0;
+    auto endOfLastMatch = first;
 
-        auto callback = [&](const std::match_results<BidirIt> &match)
-        {
-            auto positionOfThisMatch = match.position(0);
-            auto diff = positionOfThisMatch - positionOfLastMatch;
+    auto callback = [&](const std::match_results<BidirIt> &match) {
+        auto positionOfThisMatch = match.position(0);
+        auto diff = positionOfThisMatch - positionOfLastMatch;
 
-            auto startOfThisMatch = endOfLastMatch;
-            std::advance(startOfThisMatch, diff);
+        auto startOfThisMatch = endOfLastMatch;
+        std::advance(startOfThisMatch, diff);
 
-            s.append(endOfLastMatch, startOfThisMatch);
-            s.append(f(match));
+        s.append(endOfLastMatch, startOfThisMatch);
+        s.append(f(match));
 
-            auto lengthOfMatch = match.length(0);
+        auto lengthOfMatch = match.length(0);
 
-            positionOfLastMatch = positionOfThisMatch + lengthOfMatch;
+        positionOfLastMatch = positionOfThisMatch + lengthOfMatch;
 
-            endOfLastMatch = startOfThisMatch;
-            std::advance(endOfLastMatch, lengthOfMatch);
-        };
+        endOfLastMatch = startOfThisMatch;
+        std::advance(endOfLastMatch, lengthOfMatch);
+    };
 
-        std::regex_iterator<BidirIt> begin(first, last, re), end;
-        std::for_each(begin, end, callback);
+    std::regex_iterator<BidirIt> begin(first, last, re), end;
+    std::for_each(begin, end, callback);
 
-        s.append(endOfLastMatch, last);
+    s.append(endOfLastMatch, last);
 
-        return s;
-    }
+    return s;
+}
 
-    template<class Traits, class CharT, class UnaryFunction>
-    std::string regex_replace(const std::string &s,
-        const std::basic_regex<CharT, Traits> &re, UnaryFunction f)
-    {
-        return regex_replace(s.cbegin(), s.cend(), re, f);
-    }
+template<class Traits, class CharT, class UnaryFunction>
+std::string regex_replace(const std::string &s,
+                          const std::basic_regex<CharT, Traits> &re, UnaryFunction f)
+{
+    return regex_replace(s.cbegin(), s.cend(), re, f);
+}
 }
 
 //-------------------------------------------------------------------------
@@ -58,12 +68,14 @@ namespace std
 void request_install_cli(const cli_t *cli, bool install)
 {
     extern bool g_b_ignore_ui_notification;
-    class cli_install_req_t: public ui_request_t
+    class cli_install_req_t : public ui_request_t
     {
         const cli_t *cli;
         bool install;
+
     public:
-        cli_install_req_t(const cli_t *cli, bool install) : cli(cli), install(install)
+        cli_install_req_t(const cli_t *cli, bool install)
+            : cli(cli), install(install)
         {
         }
 
@@ -81,28 +93,27 @@ void request_install_cli(const cli_t *cli, bool install)
     };
 
     execute_ui_requests(
-        new cli_install_req_t(cli, install),
-        nullptr);
+            new cli_install_req_t(cli, install),
+            nullptr);
 }
 
 //-------------------------------------------------------------------------
 // Finds the Python external language object (once and caches it)
 extlang_t *pylang()
 {
-    struct find_python: extlang_visitor_t
-    {
+    struct find_python : extlang_visitor_t {
         extlang_t **pylang;
         virtual ssize_t idaapi visit_extlang(extlang_t *extlang) override
         {
-            if (streq(extlang->fileext, "py"))
-            {
+            if (streq(extlang->fileext, "py")) {
                 *pylang = extlang;
                 return 1;
             }
             return 0;
         }
 
-        find_python(extlang_t **pylang): pylang(pylang)
+        find_python(extlang_t **pylang)
+            : pylang(pylang)
         {
             for_all_extlangs(*this, false);
         }
@@ -126,9 +137,8 @@ private:
     static std::regex RE_EVAL;
     std::regex re_replace;
 
-    struct LongerPatternSort
-    {
-        bool operator()(const std::string& lhs, const std::string& rhs) const
+    struct LongerPatternSort {
+        bool operator()(const std::string &lhs, const std::string &rhs) const
         {
             if (lhs.size() > rhs.size())
                 return true;
@@ -143,7 +153,8 @@ private:
     repl_func_t m_repl_func;
 
 public:
-    macro_replacer_t(repl_func_t repl_func) : m_repl_func(repl_func) {}
+    macro_replacer_t(repl_func_t repl_func)
+        : m_repl_func(repl_func) {}
 
     std::string operator()(std::string text)
     {
@@ -158,19 +169,13 @@ public:
     {
         std::string out;
         out.reserve(re_text.size() * 2);
-        for (auto ch: re_text)
-        {
-            if (isalnum(ch))
-            {
+        for (auto ch : re_text) {
+            if (isalnum(ch)) {
                 out += ch;
                 continue;
-            }
-            else if (ch == 0)
-            {
+            } else if (ch == 0) {
                 out += "\\x0";
-            }
-            else
-            {
+            } else {
                 out += '\\';
                 out += ch;
             }
@@ -194,8 +199,7 @@ public:
             return;
 
         std::string re_str;
-        for (auto &kv: replace_map)
-        {
+        for (auto &kv : replace_map) {
             re_str.append(escape_re(kv.first));
             re_str.append("|");
         }
@@ -207,3 +211,5 @@ public:
     }
 };
 std::regex macro_replacer_t::RE_EVAL = std::regex(R"(\$\{(.+?)\}\$)");
+
+#endif
